@@ -1,0 +1,5 @@
+function oop_new(name: string, extends: strings): string:
+    set {_this} to random uuid
+    set {-instances::%{_this}%::_name} to {_name}
+    set {-instances::%{_this}%::_extends::*} to {_extends::*}
+    return {_this}

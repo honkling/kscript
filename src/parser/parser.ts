@@ -18,6 +18,10 @@ import { Import } from "../statement/import";
 import { Statement } from "../statement/statement";
 import { FunctionDeclaration } from "../statement/functionDeclaration";
 import { VariableDeclaration } from "../statement/variableDeclaration";
+import { VariableAssignment } from "../statement/variableAssignment";
+import { Return } from "../statement/return";
+import { FunctionCall } from "../expression/functionCall";
+import { Variable } from "../expression/variable";
 
 export class Parser {
     public imports = new Map<string, Import[]>();
@@ -43,8 +47,29 @@ export class Parser {
             }
             case TokenTypes.KEYWORD_FUNCTION: return this.parseFunction();
             case TokenTypes.KEYWORD_VALUE:
+            case TokenTypes.KEYWORD_VARIABLE:
+                if (!(parent instanceof Block))
+                    throw new Error("Parent node of variable declaration must be a block.");
+
+                return this.parseVariableDeclaration(parent);
             default: throw new Error("Unexpected statement.");
         }
+    }
+
+    public parseVariableDeclaration(parent?: Block): VariableDeclaration {
+        const token = this.stream.consume();
+        const isMutable = token.type === TokenTypes.KEYWORD_VARIABLE;
+
+        if (!isMutable)
+            token.expectType(TokenTypes.KEYWORD_VALUE, "Expected 'val' or 'var', found {type}.");
+
+        const statement = new VariableDeclaration(isMutable, null, null, null, parent);
+        statement.name = this.stream.consume().expectType(TokenTypes.IDENTIFIER).raw;
+        this.stream.consume().expectType(TokenTypes.SYMBOL_EQUALS);
+        const value = statement.value = this.parseExpression(statement);
+        statement.type = value.type;
+
+        return statement;
     }
 
     public parseFunction(parent?: Block): FunctionDeclaration {
@@ -116,10 +141,21 @@ export class Parser {
 
         for (const statement of block.statements) {
             if (statement instanceof FunctionDeclaration)
-                clazz.methods[statement.func.name] = statement;
-            else if (statement instanceof Field)
+                clazz.methods.set(statement.func.name, statement.func);
+            else if (statement instanceof Field) {
                 clazz.fields.push(statement);
-            else
+
+                const constructor = clazz.methods.get("<init>");
+
+                if (!constructor)
+                    continue;
+
+                const { block } = constructor;
+                const returnStatement = block.statements.pop();
+                const assignment = new VariableAssignment(statement.name, statement.value, block);
+
+                block.statements.push(assignment, returnStatement);
+            } else
                 throw new Error("Only fields and methods can be declared in classes.");
         }
 
@@ -163,25 +199,43 @@ export class Parser {
     public parseConstructor(parent: Class): Constructor {
         this.stream.consume().expectType(TokenTypes.SYMBOL_OPEN_PAREN, "Expected opening parentheses for constructor, found {type}");
 
-        const constructor = new Constructor([], [], null, parent);
+        const constructor = new Constructor([], [], new Block([]), parent);
+
+        const declaration = new VariableDeclaration(false, "this", "string", new FunctionCall("oop_new", []));
+        const value = declaration.value as FunctionCall;
+        value.parameters.push(new String(parent.name, value));
+        constructor.block.statements.push(declaration);
 
         while (this.stream.peek().type !== TokenTypes.SYMBOL_CLOSE_PAREN) {
             const entry = this.parseFieldOrParameter(constructor);
 
-            if (entry instanceof Field)
+            if (entry instanceof Field) {
                 constructor.fields.push(entry);
-            else
+
+                if (entry.value) {
+                    const statement = new VariableAssignment(
+                        entry.name,
+                        entry.value,
+                        constructor.block
+                    );
+
+                    constructor.block.statements.push(statement);
+                }
+            } else
                 constructor.parameters.push(entry);
 
             if (this.stream.peek().type === TokenTypes.SYMBOL_COMMA)
                 this.stream.consume();
         }
 
+        const returnStatement = new Return(null, constructor.block);
+        returnStatement.value = new Variable("this", returnStatement);
+        constructor.block.statements.push(returnStatement);
         this.stream.consume().expectType(TokenTypes.SYMBOL_CLOSE_PAREN, "Expected closing parentheses for constructor, found {type}");
         return constructor;
     }
 
-    public parseExpression(parent: Node): Expression {
+    public parseExpression(parent: Node): Expression<any> {
         const token = this.stream.peek();
 
         switch (token.type) {

@@ -1,7 +1,10 @@
 import { Node } from "../node/node";
+import { Block } from "../statement/block";
 
-export class Expression extends Node {
-    constructor(parent: Node) {
+export abstract class Expression<T> extends Node {
+    constructor(public type: string, parent: Node) {
         super(parent);
     }
+
+    public abstract get(block: Block): T
 }

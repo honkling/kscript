@@ -8,7 +8,7 @@ export class Field extends Statement {
         public mutable: boolean,
         public name: string,
         public type: string,
-        public value: Expression,
+        public value: Expression<any> | null,
         public parent: Class
     ) {
         super(parent);

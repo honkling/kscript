@@ -4,10 +4,7 @@ class Token(
     val start: integer
 ) {
     fun expect(type: TokenType): Token {
-        if (this.type == type)
-            return this
-
-        throw("Expected ${this.type}, found $type")
+        val a = 1
     }
 }
 

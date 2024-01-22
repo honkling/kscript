@@ -6,7 +6,7 @@ export class Parameter extends Node {
     constructor(
         public name: string,
         public type: string,
-        public value: Expression | null,
+        public value: Expression<any> | null,
         parent: Function
     ) {
         super(parent);

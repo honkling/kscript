@@ -9,7 +9,7 @@ export class Function extends Node {
         public name: string,
         public parameters: Parameter[],
         public block: Block,
-        public returnType: string,
+        public returnType: string | null,
         parent: Class | FunctionDeclaration
     ) {
         super(parent);

@@ -1,0 +1,1 @@
+export class SymbolTable extends Map<string, any> {}
